@@ -14,5 +14,9 @@
  {
    "repository": "CyanogenMod/android_vendor_nxp-nfc_opensource_Nfc",
    "target_path": "vendor/nxp-nfc/opensource/Nfc"
+ },
+ {
+   "repository": "themuppets/proprietary_vendor_htc",
+   "target_path": "vendor/htc"
  }
 ]
