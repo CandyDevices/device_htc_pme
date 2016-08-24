@@ -23,6 +23,7 @@
  {
    "repository": "themuppets/proprietary_vendor_htc",
    "target_path": "vendor/htc",
-   "remote": "github"
+   "remote": "github",
+   "branch": "cm-13.0"
  }
 ]
