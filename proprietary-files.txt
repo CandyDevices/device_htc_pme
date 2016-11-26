@@ -28,6 +28,9 @@ etc/Hdmi_cal.acdb
 etc/Headset_cal.acdb
 etc/Speaker_cal.acdb
 
+# Audio amplifier
+etc/Tfa98xx.cnt
+
 # Audio libraries
 vendor/lib64/libacdb-fts.so
 vendor/lib64/libacdbloader.so
@@ -50,10 +53,12 @@ vendor/lib/soundfx/libswdap.so
 
 # Camera
 bin/mm-qcamera-daemon
+etc/camera/imx377_chromatix.xml
+etc/camera/msm8996_camera.xml
+etc/camera/s5k4e6_htc_chromatix.xml
 lib/hw/camera.msm8996.so
 lib/libawb_calibration.so
 lib/libBeautyChat.so
-lib/libcameraface.so
 lib/libcamerapp.so
 lib/libmmjpeg_interface.so
 lib/libmm-qcamera.so
@@ -465,7 +470,6 @@ vendor/lib/libqmi.so
 vendor/lib/libsmemlog.so
 
 # Radio
-bin/ATFWD-daemon
 bin/netmgrd
 bin/qmuxd
 bin/radish
@@ -479,7 +483,6 @@ priv-app/qcrilmsgtunnel/qcrilmsgtunnel.apk
 vendor/bin/qti
 vendor/lib64/libcneapiclient.so
 vendor/lib64/libconfigdb.so
-vendor/lib64/libhtcril_db.so
 vendor/lib64/liblqe.so
 vendor/lib64/libmdmdetect.so
 vendor/lib64/libnetmgr.so
@@ -620,7 +623,6 @@ lib/hw/sensors.msm8996.so
 lib/libmorpho_movie_stabilizer4.so
 lib/libprojector.so
 lib64/libprojector.so
-vendor/firmware/libpn548_fw.so
 vendor/lib/hw/activity_recognition.msm8996.so
 vendor/lib/hw/keystore.msm8996.so
 vendor/lib/hw/sound_trigger.primary.msm8996.so
@@ -702,7 +704,6 @@ vendor/lib/libfastcvopt.so
 vendor/lib/libgdtap.so
 vendor/lib/libhdcp1prov.so
 vendor/lib/libhtc_common.so
-vendor/lib/libhtcril_db.so
 vendor/lib/libhwdaphal.so
 vendor/lib/libimscamera_jni.so
 vendor/lib/libimsmedia_jni.so
