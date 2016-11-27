@@ -483,6 +483,7 @@ priv-app/qcrilmsgtunnel/qcrilmsgtunnel.apk
 vendor/bin/qti
 vendor/lib64/libcneapiclient.so
 vendor/lib64/libconfigdb.so
+vendor/lib64/libhtcril_db.so
 vendor/lib64/liblqe.so
 vendor/lib64/libmdmdetect.so
 vendor/lib64/libnetmgr.so
@@ -704,6 +705,7 @@ vendor/lib/libfastcvopt.so
 vendor/lib/libgdtap.so
 vendor/lib/libhdcp1prov.so
 vendor/lib/libhtc_common.so
+vendor/lib/libhtcril_db.so
 vendor/lib/libhwdaphal.so
 vendor/lib/libimscamera_jni.so
 vendor/lib/libimsmedia_jni.so
