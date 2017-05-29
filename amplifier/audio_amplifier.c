@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016, The CyanogenMod Project
+ * Copyright (C) 2017, The LineageOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,21 +28,14 @@
 #include <system/audio.h>
 
 #include "tfa.h"
-#include "tfa-cont.h"
-#include "tfa9888.h"
-
-#define VSTEP                   0
-#define FORCED_GAIN             75
-#define FORCED_GAIN_EARPIECE    100
 
 #define UNUSED __attribute__ ((unused))
 
 typedef struct amp_device {
     amplifier_device_t amp_dev;
     tfa_t *tfa;
-    tfa_cont_t *tc;
+    tfa_profile_t profile;
     audio_mode_t mode;
-    struct pcm *pcm;
 } amp_device_t;
 
 static amp_device_t *amp_dev = NULL;
@@ -54,19 +48,6 @@ static int amp_set_mode(struct amplifier_device *device, audio_mode_t mode)
     dev->mode = mode;
     return ret;
 }
-
-#define PROFILE_MUSIC           0
-#define PROFILE_RINGTONE        1
-#define PROFILE_FM              2
-#define PROFILE_VIDEO_RECORD    3
-#define PROFILE_HANDSFREE_NB    4
-#define PROFILE_HANDSFREE_WB    5
-#define PROFILE_HANDSFREE_SWB   6
-#define PROFILE_HANDSET         7
-#define PROFILE_VOIP            8
-#define PROFILE_MFG             9
-#define PROFILE_AUDIO_EVALUATION 10
-#define PROFILE_CALIBRATION     11
 
 enum {
     IS_EARPIECE, IS_SPEAKER, IS_VOIP, IS_OTHER
@@ -138,14 +119,26 @@ static int select_profile(audio_mode_t mode, uint32_t snd_device)
     case AUDIO_MODE_RINGTONE:
         return PROFILE_RINGTONE;
     case AUDIO_MODE_IN_COMMUNICATION:
-        return PROFILE_VOIP;
+        if (device_class == IS_EARPIECE) {
+            return PROFILE_HANDSET;
+        } else if (device_class == IS_SPEAKER) {
+            return PROFILE_VOIP;
+        }
+        break;
     case AUDIO_MODE_NORMAL:
-    case AUDIO_MODE_IN_CALL:
         if (device_class == IS_EARPIECE) {
             return PROFILE_HANDSET;
         } else if (device_class == IS_SPEAKER) {
             return PROFILE_MUSIC;
         }
+        break;
+    case AUDIO_MODE_IN_CALL:
+        if (device_class == IS_EARPIECE) {
+            return PROFILE_HANDSET;
+        } else if (device_class == IS_SPEAKER) {
+            return PROFILE_HANDSFREE_WB;
+        }
+        break;
     default:
         switch(device_class) {
         case IS_EARPIECE:
@@ -154,49 +147,29 @@ static int select_profile(audio_mode_t mode, uint32_t snd_device)
             return PROFILE_MUSIC;
         case IS_VOIP:
             return PROFILE_VOIP;
-        default:
-            return -1;
         }
     }
+    return -1;
 }
 
-static void do_set_gain(amp_device_t *amp_dev, uint32_t gain)
-{
-    ALOGV("setting gain to %u", gain);
-    tfa_set_bitfield(amp_dev->tfa, BF_GAIN, gain);
-}
-
-static void set_gain(amp_device_t *dev, uint32_t snd_device)
-{
-    switch(classify_snd_device(snd_device)) {
-    case IS_EARPIECE:
-        do_set_gain(dev, FORCED_GAIN_EARPIECE);
-        break;
-    default:
-        do_set_gain(dev, FORCED_GAIN);
-        break;
-    }
-}
-
-static int amp_enable_output_devices(struct amplifier_device *device, uint32_t snd_device, bool enable)
+static int amp_enable_output_devices(struct amplifier_device *device, uint32_t snd_device, bool enable UNUSED)
 {
     amp_device_t *dev = (amp_device_t *) device;
     int profile = select_profile(dev->mode, snd_device);
-    if (profile < 0 || !enable) {
-        if (dev->pcm) {
-            tfa_clocks_off(dev->tfa, dev->pcm);
-            tfa_stop(dev->tfa);
-            dev->pcm = NULL;
-        }
-    } else {
-        if (!dev->pcm) {
-            dev->pcm = tfa_clocks_on(dev->tfa);
-        }
-        ALOGV("%s: starting profile %d vstep <hardcoded to %d>", __func__, profile, VSTEP);
-        tfa_start(dev->tfa, dev->tc, profile, VSTEP);
-        set_gain(dev, snd_device);
+
+    if (profile < 0 || profile >= PROFILE_MAX) {
+        ALOGE("%s: Invalid profile: %d", __func__, profile);
+        goto out;
+    }
+    if (profile == amp_dev->profile) {
+        // no need to re-apply current profile
+        goto out;
     }
 
+    tfa_apply_profile(dev->tfa, profile);
+    amp_dev->profile = profile;
+
+out:
     return 0;
 }
 
@@ -205,8 +178,6 @@ static int amp_dev_close(hw_device_t *device)
     amp_device_t *dev = (amp_device_t *) device;
 
     tfa_destroy(dev->tfa);
-    tfa_cont_destroy(dev->tc);
-
     free(dev);
 
     return 0;
@@ -216,11 +187,11 @@ static void init(void)
 {
     struct pcm *pcm;
 
+    ALOGI("Initializing");
+    tfa_apply_profile(amp_dev->tfa, PROFILE_MUSIC);
     pcm = tfa_clocks_on(amp_dev->tfa);
-    tfa_start(amp_dev->tfa, amp_dev->tc, 0, 0);
+    ALOGI("Init successful: %d", tfa_wait_for_init(amp_dev->tfa));
     tfa_clocks_off(amp_dev->tfa, pcm);
-
-    tfa_stop(amp_dev->tfa);
 }
 
 static int amp_module_open(const hw_module_t *module, const char *name UNUSED,
@@ -228,7 +199,6 @@ static int amp_module_open(const hw_module_t *module, const char *name UNUSED,
 {
     int ret;
     tfa_t *tfa;
-    tfa_cont_t *tc;
 
     if (amp_dev) {
         ALOGE("%s:%d: Unable to open second instance of the amplifier\n", __func__, __LINE__);
@@ -238,12 +208,6 @@ static int amp_module_open(const hw_module_t *module, const char *name UNUSED,
     tfa = tfa_new();
     if (!tfa) {
         ALOGE("%s:%d: Unable to tfa lib\n", __func__, __LINE__);
-        return -ENOENT;
-    }
-    tc = tfa_cont_new("/system/etc/Tfa98xx.cnt");
-    if (!tc) {
-        ALOGE("%s:%d: Unable to open tfa container\n", __func__, __LINE__);
-        tfa_destroy(tfa);
         return -ENOENT;
     }
 
@@ -270,7 +234,6 @@ static int amp_module_open(const hw_module_t *module, const char *name UNUSED,
     amp_dev->amp_dev.input_stream_standby = NULL;
 
     amp_dev->tfa = tfa;
-    amp_dev->tc  = tc;
 
     init();
 
@@ -289,8 +252,8 @@ amplifier_module_t HAL_MODULE_INFO_SYM = {
         .module_api_version = AMPLIFIER_MODULE_API_VERSION_0_1,
         .hal_api_version = HARDWARE_HAL_API_VERSION,
         .id = AMPLIFIER_HARDWARE_MODULE_ID,
-        .name = "Kiwi audio amplifier HAL",
-        .author = "The CyanogenMod Open Source Project",
+        .name = "PME audio amplifier HAL",
+        .author = "The LineageOS Open Source Project",
         .methods = &hal_module_methods,
     },
 };
